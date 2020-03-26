@@ -1,0 +1,71 @@
+[gcode_macro TOOL_PARK]
+variable_parameter_TOOL: 0
+gcode:
+  M118 ToolPark > Tool {params.TOOL|string}
+
+## TODO: check if homed first ?
+
+  {% if printer["gcode_macro tool_config_"~params.TOOL] is defined and printer["gcode_macro tool_config_"~params.TOOL].enabled is defined %}
+    {% if printer["gcode_macro tool_config_"~params.TOOL].enabled  %}
+
+        M118 ToolPark > Starting park
+
+        {% if printer["gcode_macro tool_config_"~params.TOOL].no_park is defined and printer["gcode_macro tool_config_"~params.TOOL].no_park|int == 1 %}
+          M118 Fake Park
+        {% else %}
+          
+          M118 Printer at {printer.gcode.gcode_position.x},{printer.gcode.gcode_position.y} height:{printer.gcode.gcode_position.z}
+
+          {% set offset_x = printer["gcode_macro tool_config_"~params.TOOL].offset_x  %}
+          {% set offset_y = printer["gcode_macro tool_config_"~params.TOOL].offset_y  %}
+          {% set offset_z = printer["gcode_macro tool_config_"~params.TOOL].offset_z  %}
+
+          {% set park_x = printer["gcode_macro stepper_x"].position_endstop|float + printer["gcode_macro tool_config_"~params.TOOL].park_offset_x|float %}
+          {% set park_y = printer["gcode_macro stepper_y"].position_endstop|float + printer["gcode_macro tool_config_"~params.TOOL].park_offset_y|float %}
+          {% set park_depth = park_y|float + printer["gcode_macro tool_config_"~params.TOOL].park_depth_y|float %}
+
+          {% set y_safe = printer["gcode_macro toolch_config"].safe_y_offset|float + park_y|float %}
+          {% if printer["gcode_macro toolch_config"].safe_y_offset|float > 0 %}
+            {% set direction_y_safe = -1 %}
+          {% else %}
+            {% set direction_y_safe = 1 %}
+          {% endif %}
+
+          {% if direction_y_safe == -1 and printer.toolhead.position.y < y_safe %}
+            M118 Moving to safe Y{y_safe} X{park_x}
+            G0 Y{y_safe} F{printer["gcode_macro toolch_config"].speed_approach|int}
+            G0 X{park_x} F{printer["gcode_macro toolch_config"].speed_approach|int}
+          {% endif %}
+
+          {% if direction_y_safe == 1 and printer.toolhead.position.y > y_safe %}
+            M118 Moving to safe Y{y_safe} X{park_x}
+            G0 Y{y_safe} F{printer["gcode_macro toolch_config"].speed_approach|int}
+            G0 X{park_x} F{printer["gcode_macro toolch_config"].speed_approach|int}
+          {% endif %}
+ 
+          M118 Moving before park at ({park_x},{park_y})
+          G0 X{park_x} Y{park_y} F{printer["gcode_macro toolch_config"].speed_approach|int}
+
+          M118 Moving to bottom at ({park_x},{park_depth})
+          G0 X{park_x} Y{park_depth} F{printer["gcode_macro toolch_config"].speed_depth|int}
+
+          M118 Unlocking...
+          TOOLCH_UNLOCK
+
+          M118 Moving to park at ({park_x},{park_y})
+          G0 X{park_x} Y{park_y} F{printer["gcode_macro toolch_config"].speed_depth|int}
+
+          M118 Moving to safe_y at {y_safe}
+          G0 Y{y_safe} F{printer["gcode_macro toolch_config"].speed_depth}
+
+          SET_GCODE_VARIABLE MACRO=toolch_config VARIABLE=current_tool VALUE={printer["gcode_macro toolch_config"].no_tool}
+          M118 Current tool index: {printer["gcode_macro toolch_config"].no_tool}
+
+        {% endif %}
+
+    {% else %}
+        M118 Tool not enabled    
+    {% endif %}
+  {% else %}
+    M118 Tool not configured or does not exist
+  {% endif %}
