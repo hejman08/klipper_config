@@ -31,7 +31,7 @@ gcode:
             {% set direction_y_safe = 1 %}
           {% endif %}
 
-          {% if direction_y_safe == -1 and printer.toolhead.position.y < y_safe %}
+          {% if direction_y_safe == -1 and printer.toolhead.position.y > y_safe %}
             M118 Moving to safe Y{y_safe} X{park_x}
             G0 Y{y_safe} F{printer["gcode_macro toolch_config"].speed_approach|int}
             G0 X{park_x} F{printer["gcode_macro toolch_config"].speed_approach|int}
